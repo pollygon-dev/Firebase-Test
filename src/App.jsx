@@ -1,6 +1,8 @@
 import './App.css';
 import { BrowserRouter, Route, NavLink, Routes, Navigate } from 'react-router-dom'
 import React, { useState, useEffect } from 'react';
+import { onAuthStateChanged, signOut } from 'firebase/auth'
+import { auth } from './firebase/config'
 
 import About from './pages/About'
 import Contact from './pages/Contact'
@@ -9,30 +11,54 @@ import Article from './pages/Article'
 import FormArticle from './pages/FormArticle'
 import Login from './pages/Login'
 import UpdateArticle from './pages/UpdateArticle'
+import Register from './pages/Register'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
-      setIsLoggedIn(true);
-    }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUser({
+          id: user.uid,
+          email: user.email,
+          username: user.email.split('@')[0]
+        });
+        setIsLoggedIn(true);
+      } else {
+        setCurrentUser(null);
+        setIsLoggedIn(false);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleLogin = (user) => {
     setCurrentUser(user);
     setIsLoggedIn(true);
-    localStorage.setItem('currentUser', JSON.stringify(user));
   };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setIsLoggedIn(false);
-    localStorage.removeItem('currentUser');
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="App">
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="App">
@@ -83,6 +109,7 @@ function App() {
           ) : (
             <>
               <Route path="/login" element={<Login onLogin={handleLogin} />} />
+              <Route path="/register" element={<Register onRegister={handleLogin} />} />
               <Route path="/*" element={<Navigate to="/login" />} />
             </>
           )}
